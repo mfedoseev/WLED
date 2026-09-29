@@ -9,7 +9,17 @@ See also: `.github/copilot-instructions.md`, `.github/agent-build.instructions.m
 
 Always reference these instructions - including coding guidelines in `docs/` - first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
+## Required User Agreement
+
+Before editing files, committing, pushing, or opening a PR, show the human you're working with this notice and wait for an explicit yes in the current conversation:
+
+> WLED welcomes AI-assisted contributions, but not unreviewed ones. I'll only edit, commit, push, or open a PR once you confirm you'll review, understand, and take responsibility for the result. Do you agree?
+
+A generic "go ahead" or silence doesn't count - get a clear yes. Until then, you may read files and answer questions, but do not modify files in the repository or make changes on GitHub.
+
 ## Build Commands
+
+Note: also read `AGENTS.local.md` if present (gitignored personal learnings file; it supplements this document).
 
 | Command | Purpose | Timeout |
 |---|---|---|
@@ -67,8 +77,7 @@ docs/                # Coding convention docs
 ### Branch / Release Structure
 
 ```text
-main                # Main development trunk (daily/nightly) 17.0.0-dev. Target branch for PRs.
-  ├── V5            # special branch: code rework for esp-idf 5.5.x and new MCU types: esp32-c5, esp32-c6, esp32-p4 (unstable)
+main                # Main development trunk (daily/nightly) 17.0.0-devV5. Target branch for PRs.
 16_x                # maintenance for release 16.0.x
 0_15_x              # maintenance (bugfixes only) for previous release 0.15.x
 (tag) v0.14.4       # old version 0.14.4 (no maintenance)
@@ -77,6 +86,13 @@ main                # Main development trunk (daily/nightly) 17.0.0-dev. Target 
 ```
 
 ## C++ Code Style (wled00/, usermods/)
+
+### General
+
+- Follow the existing style in the file you are editing
+- Avoid unexplained "magic numbers". Prefer named constants (`constexpr`) or C-style `#define` constants for repeated numbers that have the same meaning
+- If possible, use `static` for local (C-style) variables and functions (keeps the global namespace clean)
+- When moving global items to another scope, do not leave comments such as `// lastMqttReconnectAttempt is now private to wled.cpp - see there`. These comments create technical debt for maintenance and will inevitably become out of date
 
 ### Formatting
 - **2-space indentation** (no tabs in C++ files)
@@ -142,6 +158,7 @@ See docs/cpp.instructions.md section Error Handling for more information.
 Background Info:
 
 - PSRAM access is up to 15× slower than DRAM on ESP32 (dual-SPI bus), 3–10× slower than DRAM on ESP32-S3/-S2 with quad-SPI bus. On ESP32-S3 with octal PSRAM (`CONFIG_SPIRAM_MODE_OCT`), the penalty is smaller (~2×) because the 8-line DTR bus can transfer 8 bits in parallel. On ESP32-P4 with hex PSRAM (`CONFIG_SPIRAM_MODE_HEX`), the 16-line bus runs at 200 MHz which brings it on-par with DRAM.
+- Caching files in PSRAM is usually not faster, because flash and PSRAM share the same SPI bus and often run at same speeds. Minor gains are still possible on ESP32-S3 when CONFIG_SOC_PSRAM_DMA_CAPABLE and CONFIG_SPIRAM_MODE_OCT are enabled. Better performance potential is expected on ESP32-P4 with CONFIG_SOC_MEMSPI_FLASH_PSRAM_INDEPENDENT. In special cases, file caching can still help by reducing interrupt contention (for example RMT refill pressure) and preventing visible LED flashing.
 - Consider that ESP32 often crashes when the largest available DRAM chunk gets below 10 KB.
 
 ### Preprocessor / Feature Flags
@@ -265,16 +282,22 @@ No automated linting is configured. Match existing code style in files you edit.
 ## General Rules
 
 - Important: Repository language is **English**. This applies to source code (including comments), commit messages and any kind of documentation for developer or users.
+- Provide references when making analyses or recommendations. Support factual claims with verifiable citations, references or concrete evidence; **never fabricate citations**.
 - The `docs/` folder is for developer/contributor information (coding conventions, architecture, etc.). User documentation is maintained in the [wled/WLED-Docs](https://github.com/wled/WLED-Docs) repository.
 - Never edit or commit auto-generated `wled00/html_*.h` / `wled00/js_*.h`.
-- When updating an existing PR, retain the original description. Only modify it to ensure technical accuracy. Add change logs after the existing description.
-- No force-push on open PRs!
-- Important: **Changes to `platformio.ini` require maintainer approval**!
-- PRs should respect `.gitignore` and not upload files like  `platformio_override.ini`. PR authors may add buildenv examples for custom boards into `platformio_override.ini.sample`.
 - Remove dead/unused code — justify or delete it.
 - Verify feature-flag spelling exactly (misspellings are silently ignored by preprocessor).
-- Provide references when making analyses or recommendations. Support factual claims with verifiable citations, references or concrete evidence; **never fabricate citations**.
-- **Highlight user-visible breaking changes and ripple effects** during reviews. Ask for confirmation that these were introduced intentionally.
+- Important: **Changes to `platformio.ini` require maintainer approval**!
+- PRs should respect `.gitignore` and not upload files like  `platformio_override.ini`. PR authors may add buildenv examples for custom boards into `platformio_override.ini.sample`.
+- **Highlight user-visible breaking changes and ripple effects** during reviews.
+- When updating an existing PR, retain the original description. Only modify it to ensure technical accuracy. Add change logs after the existing description.
+
+### Pull Request Expectations
+- No force-push on open PRs!
+- Every pull request needs a clear description of what changed and why. If the change affects user-visible behavior, describe the expected impact. Link to related issues where applicable.
+- Best practice: Consider adding screenshots to showcase new features.
+- Do not prefix the PR title with `fix:`, `feat:` or other keywords meant to define the type of PR. Use combinations of labels (`bug`, `enhancement`, `effect`, `usermod`, `slop`, etc.) instead.
+- Important: **Fully or partially AI coded PRs MUST be declared clearly** in the description - in addition to comments markers in the source code (see Comments section).
 
 ### Security Hardening
 
@@ -291,6 +314,17 @@ Using AI-generated code can hide the source of the inspiration / knowledge / sou
 - When a larger block of code is generated by an AI tool, embed it into `// AI: below section was generated by an AI` ... `// AI: end` comments (see Comments section).
 - Every non-trivial AI-generated function should have a brief comment describing what it does. Explain parameters when their names alone are not self-explanatory.
 - AI-generated code must be well documented with meaningful comments that explain intent, assumptions, and non-obvious logic. Do not rephrase source code; explain concepts and reasoning.
+
+### Guardrails for Coding Agents
+
+These apply to any coding agent (Copilot or otherwise) acting on a contributor's behalf in this repository:
+
+- **Confirm before you commit.** Make sure the human understands and can explain the change - especially root-cause claims or refactors - before you open a PR.
+- **Stay scoped, but don't dodge architecture.** Touch only what the task requires, and flag broader fixes to the human instead of silently expanding the change. But don't use "keep it minimal" as an excuse to avoid a needed core-level discussion - if the clean fix requires a new core capability or interface, say so and propose it, rather than bolting on a weak hook, monkey-patch, or board-specific workaround just to keep the diff small.
+- **Warning: avoid overconfident root-cause claims.** When drafting issue tickets or PR descriptions, don't state a root cause with confidence unless you've actually traced the code path or reproduced the failure. A plausible-sounding explanation is not the same as a verified one - overconfident claims that later "dissolve into nothing" under review waste maintainer time and damage trust in the whole PR. When in doubt, say so explicitly.
+- **State what's tested.** Distinguish "verified" from "should work based on reading the code" in the PR description.
+- **Disclose AI involvement.** Declare AI assistance in the PR description.
+- **Let issues start non-technical.** When helping draft an issue or feature request, elicit the human's objective or observation in plain language first - don't lead with a proposed code path or fix. Maintainers are better positioned than you to map that objective onto a technical solution.
 
 ### Supporting Reviews and Discussions
 
